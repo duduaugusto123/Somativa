@@ -10,9 +10,9 @@ class CustomUser(models.Model):
         ("CLIENTE","CLIENTE"),
     ]
     type = models.CharField(choices=Type_User, max_length=200)
-    user = models.OneToOneField(User, on_delete=models.CASCADE)
-    data_nasc = models.DateField(null=False,blank=False)
-    cpf = models.IntegerField(null=False,blank=False)
+    user = models.OneToOneField(User,on_delete=models.CASCADE)
+    data_nasc = models.DateField(null=True,blank=True)
+    cpf = models.IntegerField(null=True,blank=True)
         
     def __str__(self):
         return self.user.email
@@ -21,12 +21,12 @@ class CustomUser(models.Model):
 def create_user_custom(sender, instance, created, **kwargs):
     if created:
         CustomUser.objects.create(user=instance)
-
-
+        
+'''
 @receiver(post_save, sender=User)
 def save_user_custom(sender, instance, created, **kwargs):
     instance.customuser.save()
-    
+'''
     
 class Categoria_Servico(models.Model):
     Type_Category = [
