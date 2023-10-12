@@ -7,7 +7,18 @@ from rest_framework.viewsets import ModelViewSet
 from django.http import HttpResponse
 from rest_framework import status
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS
+from rest_framework.permissions import IsAuthenticated, BasePermission, SAFE_METHODS , IsAdminUser
+from django.db import transaction
+from rest_framework.generics import ListAPIView
+from django.shortcuts import get_object_or_404
+from datetime import date
+from rest_framework.decorators import action
+from django_filters.rest_framework import DjangoFilterBackend, CharFilter, NumberFilter
+from .filters import *
+
+
+
+
 
 class custom(BasePermission):
     def has_permission(self, request, view):
@@ -34,6 +45,8 @@ class JustFuncionarios(BasePermission):
         else:
             print("Cliente")
             return False
+        
+
 
 
 class CustomUserViewSet(ModelViewSet):
@@ -41,7 +54,12 @@ class CustomUserViewSet(ModelViewSet):
     serializer_class = CustomUserSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['type', 'user__username', 'data_nasc', 'cpf']
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (IsAdminUser, )
+
+    filterset_class = CustomUserFilter
+
+    ordering_fields = ['user__username']
+    ordering = ['user__username']
 
     def destroy(self, request, *args, **kwargs):
         a = request.get_full_path_info()
@@ -69,6 +87,11 @@ class ProdutosManutencaoViewSet(ModelViewSet):
     filterset_fields = ['product_name', 'qt_Stock', 'producer_name', 'producer_code', 'Buy_price', 'Sell_price']
     permission_classes = (JustFuncionarios, )
 
+    filterset_class = CustomUserFilter
+
+    ordering_fields = ['product_name']
+    ordering = ['product_name']
+
 class AutoCategoryViewSet(ModelViewSet):
     queryset = Auto_Category.objects.all()
     serializer_class = Auto_CategorySerializer
@@ -83,34 +106,53 @@ class AutoRegisterViewSet(ModelViewSet):
     filterset_fields = ['category__type', 'marca', 'modelo', 'ano']
     permission_classes = (JustFuncionarios, )
 
+
+    filterset_class = CustomUserFilter
+
+    ordering_fields = ['marca']
+    ordering = ['marca']
+
+class ReservaViewSet(ModelViewSet):
+    queryset = Reserva.objects.all()
+    serializer_class = ReservaSerializer
+    filter_backends = [DjangoFilterBackend]
+    filterset_fields = ['Cliente', 'carro']
+    permission_classes = (custom, )          
+        
+
 class ManutencionViewSet(ModelViewSet):
     queryset = Manutencion.objects.all()
     serializer_class = ManutencionSerializer
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['dados_auto__category__type', 'Service_Category__tipo', 'Used_Product__product_name', 'Price_total', 'funcionario_id__user__username', 'Cliente_id__user__username']
-    permission_classes = (IsAuthenticated, )
+    permission_classes = (custom  , )
+
+
+    @action(detail=False, methods=['GET'], permission_classes=[IsAuthenticated])
+    def client_manutencoes(self, request):
+        manutencoes = Manutencion.objects.filter(Cliente_id__user=request.user)
+
+        serializer = ManutencionSerializer(manutencoes, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
 
         quantUsed_Product = len(request.data['Used_Product'])
         ValorTotalProduto = 0
         for x in range(quantUsed_Product):
-            produto = request.data['Used_Product'][x]
-            produtoFind = Produtos_Manutencao.objects.get(id=produto)
-            produtoSerilized = Produtos_ManutencaoSerializer(produtoFind, many=False) 
+            produto_id = request.data['Used_Product'][x]
+            try:
+                    produto = Produtos_Manutencao.objects.get(id=produto_id)
+                    produtoSerialized = Produtos_ManutencaoSerializer(produto, many=False)
+                    valorProduto = int(produtoSerialized.data['Sell_price'])
+                    ValorTotalProduto += valorProduto
 
-            valorProduto = int(produtoFind['Sell_price'])
+                    produto.qt_Stock -= 1
+                    produto.save()
 
+            except Produtos_Manutencao.DoesNotExist:
+                pass
 
-            qt_StockProduto = int(produtoSerilized.data['qt_Stock'])
-            qt_StockProduto -= 1
-
-            quant_Produ_Used = request.data['Used_Product']
-            quant_Produ_Used['qt_Stock'] = qt_StockProduto
-            produtoSerilized = Produtos_ManutencaoSerializer(data=quant_Produ_Used,many=False).is_valid(raise_exception=True)
-            produtoSerilized.save()
-
-            ValorTotalProduto +=  valorProduto
 
         print(ValorTotalProduto)
 
@@ -125,9 +167,7 @@ class ManutencionViewSet(ModelViewSet):
             
         print(ValorTotalServico)
 
-        valorTotal = ValorTotalProduto+ValorTotalServico
-
-        
+        valorTotal = ValorTotalProduto+ValorTotalServico     
 
 
         Manutencao = request.data
@@ -156,6 +196,7 @@ class PaymentCategoryViewSet(ModelViewSet):
     filterset_fields = ['Payment_type']
     permission_classes = (custom, )
 
+
 class PaymentStatusViewSet(ModelViewSet):
     queryset = Payment_Status.objects.all()
     serializer_class = Payment_StatusSerializer
@@ -163,10 +204,13 @@ class PaymentStatusViewSet(ModelViewSet):
     filterset_fields = ['status']
     permission_classes = (custom, )
                 
-    def get_queryset(self,request, *args, **kwargs):        
-        CustomUser.objects.filter(user__id=request.user.id)
+    @action(detail=False, methods=['GET'], permission_classes=[IsAuthenticated])
+    def client_PaymentStatus(self, request):
 
-        return super().get_queryset()
+        payment_status = Payment_Status.objects.filter(Cliente_id__user=request.user)
+
+        serializer = ManutencionSerializer(payment_status, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
 class PaymentViewSet(ModelViewSet):
     queryset = Payment.objects.all()
@@ -174,6 +218,14 @@ class PaymentViewSet(ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['category__Payment_type', 'descrition', 'manutention_id', 'status__status', 'discount_value', 'Valor_Final']
     permission_classes = (custom, )
+
+    @action(detail=False, methods=['GET'], permission_classes=[IsAuthenticated])
+    def client_PaymentStatus(self, request):
+
+        payment = Payment.objects.filter(Cliente_id__user=request.user)
+
+        serializer = ManutencionSerializer(payment, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
     def create(self, request, *args, **kwargs):
         desconto = float(request.data['discount_value'])
@@ -195,7 +247,7 @@ class PaymentViewSet(ModelViewSet):
         return Response(paySeria.data)
 
 
-
-
-
-        return super().create(request, *args, **kwargs)
+class ProdutosComBaixoEstoqueListView(ListAPIView):
+    queryset = Produtos_Manutencao.objects.filter(qt_Stock__lt=4)
+    serializer_class = Produtos_ManutencaoSerializer
+   

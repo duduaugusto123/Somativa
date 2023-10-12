@@ -26,6 +26,13 @@ class Produtos_ManutencaoSerializer(serializers.ModelSerializer):
         fields = '__all__'
         many = True
 
+class ReservaSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Reserva
+        fields = '__all__'
+        many = True
+
+
 class Auto_CategorySerializer(serializers.ModelSerializer):
     class Meta:
         model = Auto_Category

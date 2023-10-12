@@ -22,12 +22,7 @@ def create_user_custom(sender, instance, created, **kwargs):
     if created:
         CustomUser.objects.create(user=instance)
         
-'''
-@receiver(post_save, sender=User)
-def save_user_custom(sender, instance, created, **kwargs):
-    instance.customuser.save()
-'''
-    
+
 class Categoria_Servico(models.Model):
     Type_Category = [
         ("Troca de Oleo","Troca de Oleo"),
@@ -73,6 +68,26 @@ class Auto_register(models.Model):
     def __str__(self):
         return self.category
     
+class Reserva(models.Model):
+
+    Cliente = models.ForeignKey(CustomUser, related_name="Cliente_Rquester",on_delete=models.CASCADE)
+    carro = models.ForeignKey(Auto_register, related_name="Car_Client",on_delete=models.CASCADE)
+    data_reserva = models.DateField(default=timezone.now)
+    
+    def __str__(self):
+        return str(self.data_reserva)
+    
+    def save(self, *args, **kwargs):
+        # Verifique se já existem 2 reservas para a mesma data
+        count_reservas = Reserva.objects.filter(data_reserva=self.data_reserva).count()        
+        if count_reservas >= 2:
+            raise ValueError('Já existem 2 reservas para esta data.')
+        
+        super().save(*args, **kwargs)
+
+   
+
+
 class Manutencion(models.Model):
     dados_auto = models.ForeignKey(Auto_register, related_name="Dados_Auto",on_delete=models.CASCADE)
     Service_Category = models.ManyToManyField(Categoria_Servico,related_name="Category_Service")
@@ -80,6 +95,7 @@ class Manutencion(models.Model):
     Price_total = models.IntegerField(null=True,blank=True)
     funcionario_id = models.ForeignKey(CustomUser,related_name="Service_Relized_Employee",on_delete=models.CASCADE)
     Cliente_id = models.ForeignKey(CustomUser, related_name="Service_Requester",on_delete=models.CASCADE)
+    Reserva_id = models.ForeignKey(Reserva, related_name="Reserva",on_delete=models.CASCADE, null = True, blank=True)
 
     def __str__(self):
         return self.category
