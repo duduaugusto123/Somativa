@@ -5,8 +5,13 @@ from .views import *
 from rest_framework.routers import DefaultRouter
 
 router = DefaultRouter()
-router.register(r'equipamento', equipamentoAPIView)
-router.register(r'user', userAPIView)
-router.register(r'comentario', comentarioApiView)
+router.register(r'manutencion', ManutencionViewSet)
+router.register(r'customUser', CustomUserViewSet)
+router.register(r'categoria_Servico', CategoriaServicoViewSet)
+router.register(r'produtos_Manutencao', ProdutosManutencaoViewSet)
+router.register(r'dados_auto', AutoRegisterViewSet)
+router.register(r'auto_Category', AutoCategoryViewSet)
+
+
 
 urlpatterns = router.urls

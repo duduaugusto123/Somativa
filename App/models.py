@@ -84,6 +84,8 @@ class Manutencion(models.Model):
     def __str__(self):
         return self.category
 
+
+
 class Payment_Category(models.Model):
     Payment_Type = [
         ("PIX","PIX"),
